@@ -53,12 +53,16 @@ I want to make this both a **SOC lab** and a **honeypot lab** in one, so I can w
 
 ## Problem I found: packet loss
 
-1. Large downloads from the server kept getting cut off partway
+1. Large downloads from the server kept getting cut off partway, so dashboards like Kibana and the attack map wouldn't load
 2. I used **mtr** to trace the route from my home in South Africa to the server
 3. The route was clean all the way to Contabo's network edge
-4. The loss (around 40%) showed up **inside their network, near my server**
-5. I reported it to Contabo support with the mtr results, and I'm working with them to get it fixed
-6. If they can't fix it, I may move to a different provider, maybe one in **South Africa**, though it would cost more
+4. The loss (around **40%**) showed up **inside their network, near my server**
+5. While waiting, I used an **SSH tunnel** to reach the dashboard, which got Elasticvue working
+6. I reported it to Contabo support with the mtr results as evidence
+7. Contabo **migrated my server to a new host**, keeping the same IP and data
+8. After the move, everything loaded properly ✅
+
+**What I took from it:** finding the problem, proving where it was with evidence, and reporting it clearly got it fixed.
 
 ---
 
