@@ -1,0 +1,654 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Shark Log: honeypot write-up builder</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Lexend:wght@300;400;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#E6EFED;
+  --panel:#F7FAF9;
+  --ink:#13283A;
+  --soft:#4A6070;
+  --line:#BFD0CC;
+  --honey:#D9950F;
+  --honey-ink:#3A2600;
+  --honey-wash:#FBEBC6;
+  --sea:#1F6F78;
+  --sea-wash:#D3E8E6;
+  --danger:#A13A2C;
+  --focus:#D9950F;
+  color-scheme:light;
+  box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px);
+  padding-bottom:env(safe-area-inset-bottom,0px);
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --bg:#0E1A23;--panel:#152631;--ink:#E4EEF0;--soft:#9DB3BD;--line:#2B4350;
+    --honey:#F2B33D;--honey-ink:#1C1300;--honey-wash:#3A2C0E;--sea:#5FB7BF;--sea-wash:#173A40;--danger:#F08A7A;--focus:#F2B33D;
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0E1A23;--panel:#152631;--ink:#E4EEF0;--soft:#9DB3BD;--line:#2B4350;
+  --honey:#F2B33D;--honey-ink:#1C1300;--honey-wash:#3A2C0E;--sea:#5FB7BF;--sea-wash:#173A40;--danger:#F08A7A;--focus:#F2B33D;
+  color-scheme:dark;
+}
+*,*::before,*::after{box-sizing:inherit}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{
+  margin:0;background:var(--bg);color:var(--ink);
+  font-family:"Lexend",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  font-size:19px;line-height:1.7;letter-spacing:.01em;font-weight:400;
+}
+.mono{font-family:"JetBrains Mono",ui-monospace,Consolas,monospace;font-size:.88em}
+button,input,textarea,select{font:inherit;color:inherit}
+:focus-visible{outline:3px solid var(--focus);outline-offset:3px;border-radius:6px}
+
+.wrap{max-width:1180px;margin:0 auto;padding:28px 20px 80px}
+header.top{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:18px;margin-bottom:26px}
+.brand h1{margin:0;font-size:2.1rem;line-height:1.1;font-weight:700;letter-spacing:-.01em}
+.brand p{margin:6px 0 0;color:var(--soft);max-width:46ch}
+.modes{display:flex;gap:10px;flex-wrap:wrap}
+.mode{
+  border:2px solid var(--line);background:var(--panel);padding:12px 20px;border-radius:999px;
+  cursor:pointer;font-weight:600;font-size:1rem;
+}
+.mode[aria-pressed="true"]{background:var(--honey);border-color:var(--honey);color:var(--honey-ink)}
+
+.layout{display:grid;grid-template-columns:250px minmax(0,1fr);gap:26px;align-items:start}
+@media (max-width:820px){.layout{grid-template-columns:1fr}}
+
+nav.rail{position:sticky;top:calc(env(safe-area-inset-top,0px) + 16px)}
+@media (max-width:820px){nav.rail{position:static}}
+nav.rail ol{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:4px}
+@media (max-width:820px){nav.rail ol{flex-direction:row;overflow-x:auto;padding-bottom:6px}}
+nav.rail button{
+  width:100%;text-align:left;background:none;border:0;padding:10px 12px;border-radius:10px;cursor:pointer;
+  display:flex;align-items:center;gap:12px;font-size:1rem;color:var(--soft);white-space:nowrap
+}
+nav.rail button .dot{
+  flex:none;width:28px;height:28px;border-radius:50%;border:2px solid var(--line);
+  display:grid;place-items:center;font-size:.8rem;font-weight:700;color:var(--soft)
+}
+nav.rail button.done .dot{background:var(--sea);border-color:var(--sea);color:var(--panel)}
+nav.rail button[aria-current="step"]{background:var(--panel);color:var(--ink);font-weight:600}
+nav.rail button[aria-current="step"] .dot{border-color:var(--honey);color:var(--ink)}
+
+main.panel{background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:30px 32px 26px;min-width:0}
+@media (max-width:560px){main.panel{padding:22px 16px}}
+.step-head h2{margin:0 0 4px;font-size:1.7rem;line-height:1.25;font-weight:700}
+.step-head p{margin:0 0 22px;color:var(--soft);max-width:60ch}
+
+.field{margin-bottom:20px}
+.field label,.field .lab{display:block;font-weight:600;margin-bottom:6px}
+.field .hint{display:block;color:var(--soft);font-size:.92rem;margin:-2px 0 8px}
+input[type=text],input[type=date],textarea{
+  width:100%;background:var(--bg);border:2px solid var(--line);border-radius:10px;padding:11px 14px;
+}
+textarea{min-height:120px;resize:vertical;line-height:1.7}
+input:focus,textarea:focus{border-color:var(--honey);outline:none}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+@media (max-width:560px){.row2{grid-template-columns:1fr}}
+
+.block{border-top:2px solid var(--line);padding-top:22px;margin-top:10px;margin-bottom:24px}
+.block h3{margin:0 0 4px;font-size:1.25rem;font-weight:600}
+.block > .hint{color:var(--soft);margin:0 0 14px;font-size:.95rem}
+
+.tbl-wrap{overflow-x:auto;margin-bottom:10px}
+table.edit{border-collapse:separate;border-spacing:0 6px;width:100%;min-width:480px}
+table.edit th{text-align:left;font-size:.88rem;color:var(--soft);font-weight:600;padding:0 6px}
+table.edit td{padding:0 4px;vertical-align:middle}
+table.edit td.n{width:2.2em;color:var(--soft);text-align:right;font-weight:600}
+table.edit input{padding:8px 10px;border-radius:8px}
+table.edit td.x{width:44px}
+.btn-x{width:38px;height:38px;border-radius:8px;border:2px solid var(--line);background:none;cursor:pointer;font-size:1.1rem;line-height:1;color:var(--soft)}
+.btn-x:hover{border-color:var(--danger);color:var(--danger)}
+
+.btn{
+  display:inline-flex;align-items:center;gap:8px;border-radius:10px;padding:11px 18px;cursor:pointer;
+  border:2px solid var(--line);background:var(--panel);font-weight:600;font-size:1rem
+}
+.btn:hover{border-color:var(--sea)}
+.btn.primary{background:var(--honey);border-color:var(--honey);color:var(--honey-ink)}
+.btn.primary:hover{filter:brightness(1.05)}
+.btn.quiet{border-color:transparent;background:none;color:var(--soft);padding-left:4px}
+.btn.danger{color:var(--danger)}
+
+/* the paste box: the one bold element */
+.paste{
+  background:var(--honey-wash);border:2px dashed var(--honey);border-radius:14px;padding:18px 18px 16px;margin-bottom:22px
+}
+.paste h3{margin:0 0 2px;font-size:1.15rem}
+.paste p{margin:0 0 10px;font-size:.95rem}
+.paste textarea{min-height:90px;background:var(--panel);font-family:"JetBrains Mono",ui-monospace,Consolas,monospace;font-size:.85rem}
+.paste .act{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-top:10px}
+.msg{font-size:.95rem;font-weight:600}
+.msg.ok{color:var(--sea)}
+.msg.bad{color:var(--danger)}
+
+.nav-bottom{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;border-top:2px solid var(--line);padding-top:20px;margin-top:10px}
+
+pre.preview{
+  background:var(--bg);border:2px solid var(--line);border-radius:12px;padding:18px;overflow:auto;max-height:60vh;
+  font-family:"JetBrains Mono",ui-monospace,Consolas,monospace;font-size:.82rem;line-height:1.6;white-space:pre
+}
+.save-row{display:flex;flex-wrap:wrap;gap:12px;align-items:center;margin:16px 0 8px}
+.foot{color:var(--soft);font-size:.9rem;margin-top:22px}
+.skipnote{background:var(--sea-wash);border-radius:10px;padding:12px 16px;margin-bottom:20px;font-size:.95rem}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div class="brand">
+      <h1>Shark Log 🦈</h1>
+      <p>Fill in what you found, one step at a time. It turns it into a tidy file for your GitHub repo.</p>
+    </div>
+    <div class="modes" role="group" aria-label="What are you writing?">
+      <button class="mode" data-mode="report">📊 Findings report</button>
+      <button class="mode" data-mode="malware">🦠 Malware write-up</button>
+    </div>
+  </header>
+
+  <div class="layout">
+    <nav class="rail" aria-label="Steps"><ol id="rail"></ol></nav>
+    <main class="panel" id="panel"></main>
+  </div>
+  <p class="foot">Your work saves in this browser as you type. Empty boxes are left out of the file, so skip anything you didn't look at.</p>
+</div>
+
+<script>
+/* ---------- storage ---------- */
+const KEY = "sharklog-v1";
+function blankReport(){return{
+  title:"",start:"",end:"",headline:"",
+  days:[],stats:{total:"",busiest:"",failed:"",ips:"",files:""},
+  attackers:[],p0f:[],countries:[],asn:[],
+  honeypots:[],ports:[],
+  passwords:[],usernames:[],
+  commands:[],
+  malware:[],suricata:[],
+  when:{busy:"",quiet:"",spikes:""},
+  surprised:"",learned:"",questions:"",shots:""
+}}
+function blankMalware(){return{
+  nick:"",date:"",sha:"",ftype:"",size:"",times:"",by:"",
+  vtDet:"",vtFam:"",vtFirst:"",vtLink:"",
+  arrived:"",strings:[],iocs:"",does:"",mitre:[],detect:"",learned:""
+}}
+let state;
+try{ state = JSON.parse(localStorage.getItem(KEY)||"null"); }catch(e){ state=null; }
+if(!state||!state.report||!state.malware){ state={mode:"report",step:{report:0,malware:0},report:blankReport(),malware:blankMalware()}; }
+state.report = Object.assign(blankReport(),state.report);
+state.malware = Object.assign(blankMalware(),state.malware);
+let saveT;
+function save(){ clearTimeout(saveT); saveT=setTimeout(()=>{ try{localStorage.setItem(KEY,JSON.stringify(state));}catch(e){} },250); }
+
+/* ---------- table definitions ---------- */
+const T = {
+  days:{cols:[["Day","text"],["Events","num"],["Storage","text"],["Notes","text"]]},
+  attackers:{cols:[["IP","mono"],["Events","num"],["Known bad? (AbuseIPDB)","text"]]},
+  p0f:{cols:[["OS guess","text"],["Count","num"]]},
+  countries:{cols:[["Country","text"],["Events","num"]],agg:"top_countries"},
+  asn:{cols:[["Network","text"],["Events","num"]],agg:"top_asn"},
+  honeypots:{cols:[["Honeypot","text"],["What it pretends to be","text"],["Events","num"]],agg:"top_honeypots",map:b=>[b.key,"",b.doc_count]},
+  ports:{cols:[["Port","mono"],["Usually used for","text"],["Events","num"]],agg:"top_ports",map:b=>[String(b.key),"",b.doc_count]},
+  passwords:{cols:[["Password","mono"],["Tries","num"]],agg:"top_passwords"},
+  usernames:{cols:[["Username","mono"],["Tries","num"]],agg:"top_usernames"},
+  commands:{cols:[["Command","mono"],["Times","num"],["What it does","text"]],agg:"top_commands",map:b=>[b.key,b.doc_count,""]},
+  malware:{cols:[["SHA-256","mono"],["Times seen","num"],["VirusTotal verdict","text"],["Write-up link","text"]],agg:"file_hashes",map:b=>[b.key,b.doc_count,"",""]},
+  suricata:{cols:[["Alert / CVE","text"],["Times","num"],["What it targets","text"]],agg:"top_alerts",map:b=>[b.key,b.doc_count,""]},
+  strings:{cols:[["String","mono"],["Why it's interesting","text"]]},
+  mitre:{cols:[["Technique","text"],["ID","mono"],["Evidence","text"]]}
+};
+const AGG_TO_TABLE = {};
+Object.entries(T).forEach(([k,v])=>{ if(v.agg) AGG_TO_TABLE[v.agg]=k; });
+const NICE = {passwords:"passwords",usernames:"usernames",countries:"countries",asn:"networks",honeypots:"honeypots",ports:"ports",commands:"commands",malware:"malware hashes",suricata:"alerts"};
+
+/* ---------- steps ---------- */
+const STEPS = {
+  report:[
+    {t:"The basics",d:"Name this report and say what dates it covers.",tables:[],fields:["title","start","end","headline"]},
+    {t:"The numbers",d:"Big-picture counts. Elasticvue's Indices tab shows events per day.",tables:["days"],fields:["stats"]},
+    {t:"Who and where",d:"Who attacked, and where they came from.",tables:["attackers","p0f","countries","asn"],paste:true},
+    {t:"What they hit",d:"Which fake services and ports got the most attention.",tables:["honeypots","ports"],paste:true},
+    {t:"Break-in tries",d:"The usernames and passwords bots guessed.",tables:["passwords","usernames"],paste:true},
+    {t:"Inside the trap",d:"Commands attackers typed after a fake login.",tables:["commands"],paste:true},
+    {t:"Malware and alerts",d:"Files they dropped, and known attacks Suricata spotted.",tables:["malware","suricata"],paste:true},
+    {t:"When",d:"Timing patterns, if you looked at them.",tables:[],fields:["when"]},
+    {t:"My thoughts",d:"Your own words. Rough is fine. One idea per line.",tables:[],fields:["surprised","learned","questions"]},
+    {t:"Save the file",d:"Check it, then copy or download it.",final:true}
+  ],
+  malware:[
+    {t:"ID card",d:"The basic facts about the file.",fields:["nick","date","sha","ftype","size","times","by"]},
+    {t:"VirusTotal",d:"Search the SHA-256 on virustotal.com and note what it says.",fields:["vtDet","vtFam","vtFirst","vtLink"]},
+    {t:"How it arrived",d:"What the attacker did to drop it. One step per line.",fields:["arrived"]},
+    {t:"What's inside",d:"From running strings on it in REMnux.",tables:["strings"],fields:["iocs"]},
+    {t:"What it does",d:"Your best understanding, plus MITRE ATT&CK if you can.",tables:["mitre"],fields:["does"]},
+    {t:"Defend and learn",d:"How to catch it, and what it taught you.",fields:["detect","learned"]},
+    {t:"Save the file",d:"Check it, then copy or download it.",final:true}
+  ]
+};
+
+/* ---------- helpers ---------- */
+const $ = s=>document.querySelector(s);
+function el(tag,attrs={},...kids){
+  const e=document.createElement(tag);
+  for(const [k,v] of Object.entries(attrs)){
+    if(k==="class") e.className=v;
+    else if(k.startsWith("on")) e.addEventListener(k.slice(2),v);
+    else if(v!==undefined&&v!==null) e.setAttribute(k,v);
+  }
+  kids.flat().forEach(c=>{ if(c==null) return; e.append(c.nodeType?c:document.createTextNode(c)); });
+  return e;
+}
+const data = ()=>state[state.mode];
+function fmt(n){ const s=String(n).replace(/[,\s]/g,""); return /^\d+$/.test(s)?Number(s).toLocaleString("en-US"):String(n); }
+function lines(t){ return String(t||"").split("\n").map(s=>s.trim()).filter(Boolean); }
+function cell(v,type){
+  let s=String(v??"").trim(); if(!s) return "";
+  if(type==="num") return fmt(s);
+  s=s.replace(/\|/g,"\\|");
+  if(type==="mono") return s.includes("`")?"`` "+s+" ``":"`"+s+"`";
+  return s;
+}
+function defang(s){
+  s=s.replace(/\[\.\]/g,".").replace(/^hxxp/i,"http");
+  return s.replace(/^http/i,"hxxp").replace(/\./g,"[.]");
+}
+function rowsFilled(rows){ return (rows||[]).filter(r=>r.some(c=>String(c??"").trim())); }
+
+/* ---------- step completeness for the rail ---------- */
+function stepHasContent(step){
+  const d=data();
+  if(step.final) return false;
+  if((step.tables||[]).some(k=>rowsFilled(d[k]).length)) return true;
+  return (step.fields||[]).some(f=>{
+    const v=d[f]; if(v&&typeof v==="object") return Object.values(v).some(x=>String(x).trim());
+    return String(v||"").trim();
+  });
+}
+function renderRail(){
+  const ol=$("#rail"); ol.innerHTML="";
+  const steps=STEPS[state.mode]; const cur=state.step[state.mode];
+  steps.forEach((s,i)=>{
+    const b=el("button",{class:stepHasContent(s)?"done":"",onclick:()=>{state.step[state.mode]=i;save();render();}},
+      el("span",{class:"dot","aria-hidden":"true"},stepHasContent(s)?"✓":String(i+1)), s.t);
+    if(i===cur) b.setAttribute("aria-current","step");
+    ol.append(el("li",{},b));
+  });
+}
+function refreshRail(){ renderRail(); }
+
+/* ---------- inputs ---------- */
+function textField(label,get,set,{hint,area,mono,placeholder,type}={}){
+  const id="f"+Math.random().toString(36).slice(2,8);
+  const inp = area? el("textarea",{id,placeholder:placeholder||""}) : el("input",{id,type:type||"text",placeholder:placeholder||""});
+  if(mono) inp.classList.add("mono");
+  inp.value=get()||"";
+  inp.addEventListener("input",()=>{ set(inp.value); save(); refreshRail(); });
+  return el("div",{class:"field"}, el("label",{for:id},label), hint?el("span",{class:"hint"},hint):null, inp);
+}
+
+/* ---------- editable table ---------- */
+function tableBlock(key,title,hint){
+  const def=T[key]; const d=data();
+  if(!Array.isArray(d[key])) d[key]=[];
+  const box=el("div",{class:"block"});
+  box.append(el("h3",{},title)); if(hint) box.append(el("p",{class:"hint"},hint));
+  const wrap=el("div",{class:"tbl-wrap"}); box.append(wrap);
+  function draw(){
+    wrap.innerHTML="";
+    if(!d[key].length){ wrap.append(el("p",{class:"hint",style:"color:var(--soft);margin:0 0 8px"},"No rows yet.")); return; }
+    const t=el("table",{class:"edit"});
+    t.append(el("thead",{},el("tr",{},el("th",{},"#"),def.cols.map(c=>el("th",{},c[0])),el("th",{},""))));
+    const tb=el("tbody");
+    d[key].forEach((row,ri)=>{
+      const tr=el("tr",{},el("td",{class:"n"},String(ri+1)));
+      def.cols.forEach((c,ci)=>{
+        const inp=el("input",{type:"text","aria-label":c[0]+" row "+(ri+1)});
+        if(c[1]==="mono") inp.classList.add("mono");
+        inp.value=row[ci]??"";
+        inp.addEventListener("input",()=>{ row[ci]=inp.value; save(); refreshRail(); });
+        tr.append(el("td",{},inp));
+      });
+      tr.append(el("td",{class:"x"},el("button",{class:"btn-x","aria-label":"Remove row "+(ri+1),onclick:()=>{d[key].splice(ri,1);save();draw();refreshRail();}},"×")));
+      tb.append(tr);
+    });
+    t.append(tb); wrap.append(t);
+  }
+  draw();
+  const act=el("div",{style:"display:flex;gap:10px;flex-wrap:wrap"},
+    el("button",{class:"btn",onclick:()=>{d[key].push(def.cols.map(()=>""));save();draw();const ins=wrap.querySelectorAll("tr:last-child input");if(ins[0])ins[0].focus();}},"+ Add a row"),
+    d[key].length?el("button",{class:"btn quiet danger",onclick:()=>{if(confirm("Clear every row in "+title+"?")){d[key]=[];save();draw();refreshRail();}}},"Clear all"):null
+  );
+  box.append(act);
+  box._redraw=draw;
+  return box;
+}
+
+/* ---------- paste importer ---------- */
+function pasteBox(onDone){
+  const ta=el("textarea",{placeholder:'{ "top_passwords": { "buckets": [ ... ] } }',"aria-label":"Paste Elasticvue aggregations"});
+  const msg=el("span",{class:"msg",role:"status"});
+  function run(){
+    let j; try{ j=JSON.parse(ta.value); }catch(e){ msg.className="msg bad"; msg.textContent="That isn't valid JSON. Copy everything from the Aggregations tab, including the first { and last }."; return; }
+    if(j&&j.aggregations) j=j.aggregations;
+    const filled=[]; const unknown=[];
+    Object.entries(j||{}).forEach(([name,agg])=>{
+      if(!agg||!Array.isArray(agg.buckets)) return;
+      const key=AGG_TO_TABLE[name];
+      if(!key){ unknown.push(name); return; }
+      const def=T[key];
+      const map=def.map||(b=>[String(b.key),b.doc_count]);
+      state.report[key]=agg.buckets.map(map);
+      filled.push(NICE[key]+" ("+agg.buckets.length+")");
+    });
+    if(!filled.length){ msg.className="msg bad"; msg.textContent=unknown.length?("Found "+unknown.join(", ")+", but I don't know where those go. Use the names from your saved queries."):"No results found in that paste. Check it came from the Aggregations tab."; return; }
+    save(); ta.value="";
+    msg.className="msg ok"; msg.textContent="Filled in: "+filled.join(", ")+".";
+    onDone&&onDone();
+  }
+  return el("div",{class:"paste"},
+    el("h3",{},"Paste from Elasticvue"),
+    el("p",{},"Run a saved search, open the Aggregations tab, copy everything, and paste it here. The tables fill themselves."),
+    ta, el("div",{class:"act"},el("button",{class:"btn primary",onclick:run},"Fill the tables"),msg));
+}
+
+/* ---------- step renderers ---------- */
+const TITLES = {
+  days:["Events per day","From Elasticvue → Indices."],
+  attackers:["Top attacker IPs","Attacker IPs are fine to share. Never your own server's IP."],
+  p0f:["Attacker systems (p0f)",""],
+  countries:["Top countries",""],
+  asn:["Top networks (ASN)",""],
+  honeypots:["Busiest honeypots",""],
+  ports:["Most-hit ports",""],
+  passwords:["Top passwords",""],
+  usernames:["Top usernames",""],
+  commands:["Top commands","Fill in \"What it does\" as you look each one up."],
+  malware:["Malware captured","Paste the full hash. The file shows the first 12 characters."],
+  suricata:["Known attacks (Suricata)",""],
+  strings:["Interesting strings",""],
+  mitre:["MITRE ATT&CK","e.g. Brute Force, T1110"]
+};
+function renderReportStep(i,panel){
+  const r=state.report; const s=STEPS.report[i];
+  if(i===0){
+    panel.append(textField("Report name",()=>r.title,v=>r.title=v,{placeholder:"Week 2"}));
+    panel.append(el("div",{class:"row2"},
+      textField("Start date",()=>r.start,v=>r.start=v,{placeholder:"Oct 17, 2026"}),
+      textField("End date",()=>r.end,v=>r.end=v,{placeholder:"Oct 23, 2026"})));
+    panel.append(textField("Headline",()=>r.headline,v=>r.headline=v,{area:true,hint:"One or two sentences: the most interesting thing you found."}));
+    return;
+  }
+  if(i===1){
+    panel.append(tableBlock("days",...TITLES.days));
+    const st=r.stats; const b=el("div",{class:"block"},el("h3",{},"Quick stats"));
+    b.append(el("div",{class:"row2"},
+      textField("Total events",()=>st.total,v=>st.total=v),
+      textField("Busiest day",()=>st.busiest,v=>st.busiest=v),
+      textField("Failed SSH logins",()=>st.failed,v=>st.failed=v),
+      textField("Unique attacker IPs",()=>st.ips,v=>st.ips=v)));
+    b.append(textField("Files captured",()=>st.files,v=>st.files=v));
+    panel.append(b); return;
+  }
+  if(i===7){
+    const w=r.when;
+    panel.append(textField("Busiest hour",()=>w.busy,v=>w.busy=v));
+    panel.append(textField("Quietest hour",()=>w.quiet,v=>w.quiet=v));
+    panel.append(textField("Any spikes?",()=>w.spikes,v=>w.spikes=v,{area:true}));
+    return;
+  }
+  if(i===8){
+    panel.append(textField("What surprised me",()=>r.surprised,v=>r.surprised=v,{area:true,hint:"One idea per line. Each line becomes a point."}));
+    panel.append(textField("What I learned",()=>r.learned,v=>r.learned=v,{area:true}));
+    panel.append(textField("Questions I still have",()=>r.questions,v=>r.questions=v,{area:true}));
+    panel.append(textField("Screenshots",()=>r.shots,v=>r.shots=v,{area:true,hint:"One file name per line, e.g. attack-map.png. Put the images in your screenshots folder."}));
+    return;
+  }
+  const blocks=[];
+  if(s.paste){ panel.append(pasteBox(()=>{ blocks.forEach(b=>b._redraw()); refreshRail(); })); }
+  (s.tables||[]).forEach(k=>{ const b=tableBlock(k,...TITLES[k]); blocks.push(b); panel.append(b); });
+}
+function renderMalwareStep(i,panel){
+  const m=state.malware;
+  if(i===0){
+    panel.append(textField("Nickname",()=>m.nick,v=>m.nick=v,{placeholder:"the crypto miner"}));
+    panel.append(el("div",{class:"row2"},
+      textField("Date captured",()=>m.date,v=>m.date=v),
+      textField("Times seen in honeypot",()=>m.times,v=>m.times=v)));
+    panel.append(textField("SHA-256",()=>m.sha,v=>m.sha=v,{mono:true,hint:"Never upload the file itself to GitHub. The hash is safe."}));
+    panel.append(el("div",{class:"row2"},
+      textField("File type (from the file command)",()=>m.ftype,v=>m.ftype=v),
+      textField("Size",()=>m.size,v=>m.size=v)));
+    panel.append(textField("Captured by",()=>m.by,v=>m.by=v,{placeholder:"Cowrie (SSH honeypot)"}));
+    return;
+  }
+  if(i===1){
+    panel.append(el("div",{class:"row2"},
+      textField("Detections",()=>m.vtDet,v=>m.vtDet=v,{placeholder:"35 / 70 engines"}),
+      textField("Family name",()=>m.vtFam,v=>m.vtFam=v)));
+    panel.append(textField("First seen",()=>m.vtFirst,v=>m.vtFirst=v));
+    panel.append(textField("Link",()=>m.vtLink,v=>m.vtLink=v));
+    return;
+  }
+  if(i===2){ panel.append(textField("Steps the attacker took",()=>m.arrived,v=>m.arrived=v,{area:true})); return; }
+  if(i===3){
+    panel.append(tableBlock("strings",...TITLES.strings));
+    panel.append(textField("IPs and domains found inside",()=>m.iocs,v=>m.iocs=v,{area:true,mono:true,hint:"One per line. They're made unclickable in the file automatically (1.2.3[.]4)."}));
+    return;
+  }
+  if(i===4){
+    panel.append(textField("What I think it does",()=>m.does,v=>m.does=v,{area:true,hint:"One idea per line."}));
+    panel.append(tableBlock("mitre",...TITLES.mitre));
+    return;
+  }
+  if(i===5){
+    panel.append(textField("How to detect or stop it",()=>m.detect,v=>m.detect=v,{area:true}));
+    panel.append(textField("What I learned",()=>m.learned,v=>m.learned=v,{area:true}));
+  }
+}
+
+/* ---------- markdown builders ---------- */
+function mdTable(key,rows,{shortHash}={}){
+  const def=T[key]; rows=rowsFilled(rows); if(!rows.length) return "";
+  const head="| # | "+def.cols.map(c=>c[0]).join(" | ")+" |";
+  const sep="|---|"+def.cols.map(()=>"---").join("|")+"|";
+  const body=rows.map((r,i)=>"| "+(i+1)+" | "+def.cols.map((c,ci)=>{
+    let v=r[ci]; if(shortHash&&ci===0&&v) v=String(v).trim().slice(0,12);
+    return cell(v,c[1]);
+  }).join(" | ")+" |").join("\n");
+  return head+"\n"+sep+"\n"+body;
+}
+function mdList(t){ return lines(t).map((l,i)=>(i+1)+". "+l).join("\n"); }
+function buildReport(){
+  const r=state.report; const out=[];
+  out.push("# 📊 Findings Report"+(r.title?": "+r.title.trim():""));
+  out.push("");
+  if(r.start||r.end) out.push("**Dates covered:** "+(r.start||"?").trim()+" to "+(r.end||"?").trim(),"");
+  out.push("**Written by:** HyperionFae");
+  const secs=[];
+  const add=(title,parts)=>{ parts=parts.filter(Boolean); if(parts.length) secs.push({title,parts}); };
+  if(r.headline.trim()) secs.push({title:"⭐ Headline",parts:[r.headline.trim()],plain:true});
+  const st=r.stats; const statRows=[["Total events",st.total],["Busiest day",st.busiest],["Failed SSH logins",st.failed],["Unique attacker IPs",st.ips],["Files captured",st.files]].filter(x=>String(x[1]).trim());
+  const daysT=(()=>{ const rows=rowsFilled(r.days); if(!rows.length) return "";
+    return "### Events per day\n\n| Day | Events | Storage | Notes |\n|---|---|---|---|\n"+rows.map(x=>"| "+[cell(x[0]),cell(x[1],"num"),cell(x[2]),cell(x[3])].join(" | ")+" |").join("\n"); })();
+  add("📈 The numbers",[daysT, statRows.length?"| Stat | Value |\n|---|---|\n"+statRows.map(x=>"| "+x[0]+" | "+cell(x[1],/^\d[\d,\s]*$/.test(x[1])?"num":"text")+" |").join("\n"):""]);
+  const sub=(h,t)=>t?"### "+h+"\n\n"+t:"";
+  add("👤 Who attacked",[sub("Top attacker IPs",mdTable("attackers",r.attackers)),sub("Attacker systems (p0f)",mdTable("p0f",r.p0f))]);
+  add("🌍 Where from",[sub("Top countries",mdTable("countries",r.countries)),sub("Top networks (ASN)",mdTable("asn",r.asn))]);
+  add("🎯 What they targeted",[sub("Busiest honeypots",mdTable("honeypots",r.honeypots)),sub("Most-hit ports",mdTable("ports",r.ports))]);
+  add("🔑 How they tried to get in",[sub("Top passwords",mdTable("passwords",r.passwords)),sub("Top usernames",mdTable("usernames",r.usernames))]);
+  add("⌨️ What they did inside",[sub("Top commands",mdTable("commands",r.commands))]);
+  add("🦠 Malware captured",[mdTable("malware",r.malware,{shortHash:true})]);
+  add("🚨 Known attacks (Suricata)",[mdTable("suricata",r.suricata)]);
+  const w=r.when; if(w.busy.trim()||w.quiet.trim()||w.spikes.trim()){
+    add("⏰ When",["| Busiest hour | Quietest hour | Any spikes? |\n|---|---|---|\n| "+[cell(w.busy),cell(w.quiet),cell(w.spikes.replace(/\n/g," "))].join(" | ")+" |"]);
+  }
+  add("🧠 My thoughts",[
+    lines(r.surprised).length?"### What surprised me\n\n"+mdList(r.surprised):"",
+    lines(r.learned).length?"### What I learned\n\n"+mdList(r.learned):"",
+    lines(r.questions).length?"### Questions I still have\n\n"+mdList(r.questions):""
+  ]);
+  if(lines(r.shots).length) add("🖼️ Screenshots",[lines(r.shots).map(f=>"![" + f.replace(/\.[a-z0-9]+$/i,"").replace(/[-_]/g," ") + "](../screenshots/"+f+")").join("\n\n")]);
+  let n=0;
+  secs.forEach(s=>{
+    out.push("","---","");
+    const isHead=s.title.startsWith("⭐");
+    if(!isHead) n++;
+    out.push("## "+(isHead?"":n+". ")+s.title, "", s.parts.join("\n\n"));
+  });
+  out.push("","---","","## 🔎 How I got this data","","Searches from [queries](../queries/README.md), run in Elasticvue against the `logstash-*` indices.","");
+  return out.join("\n");
+}
+function buildMalware(){
+  const m=state.malware; const out=[];
+  out.push("# 🦠 Malware Write-up"+(m.nick.trim()?": "+m.nick.trim():""),"");
+  if(m.date.trim()) out.push("**Date captured:** "+m.date.trim(),"");
+  out.push("**Analysed in:** REMnux (isolated, no network access)");
+  const sec=(t,b)=>{ if(b&&b.trim()) out.push("","---","","## "+t,"",b); };
+  const kv=rows=>{ rows=rows.filter(x=>String(x[1]).trim()); return rows.length?"| Field | Value |\n|---|---|\n"+rows.map(x=>"| "+x[0]+" | "+cell(x[1],x[2]||"text")+" |").join("\n"):""; };
+  sec("🪪 ID card",kv([["SHA-256",m.sha,"mono"],["File type",m.ftype],["Size",m.size],["Times seen in honeypot",m.times,"num"],["Captured by",m.by]]));
+  sec("🔍 VirusTotal",kv([["Detections",m.vtDet],["Family name",m.vtFam],["First seen",m.vtFirst],["Link",m.vtLink]]));
+  sec("🧵 How it arrived",mdList(m.arrived));
+  const strT=(()=>{ const rows=rowsFilled(m.strings); if(!rows.length) return ""; return "| String | Why it's interesting |\n|---|---|\n"+rows.map(r=>"| "+cell(r[0],"mono")+" | "+cell(r[1])+" |").join("\n"); })();
+  const iocs=lines(m.iocs).map(defang);
+  const inside=[strT?"### Interesting strings\n\n"+strT:"", iocs.length?"### IPs and domains inside it\n\n"+iocs.map((x,i)=>(i+1)+". `"+x+"`").join("\n"):""].filter(Boolean).join("\n\n");
+  sec("🔬 What I found inside",inside);
+  sec("🎯 What I think it does",mdList(m.does));
+  const mt=(()=>{ const rows=rowsFilled(m.mitre); if(!rows.length) return ""; return "| Technique | ID | Evidence |\n|---|---|---|\n"+rows.map(r=>"| "+cell(r[0])+" | "+cell(r[1],"mono")+" | "+cell(r[2])+" |").join("\n"); })();
+  sec("🗺️ MITRE ATT&CK",mt);
+  sec("🛡️ How to detect or stop it",mdList(m.detect));
+  sec("🧠 What I learned",mdList(m.learned));
+  out.push("");
+  return out.join("\n");
+}
+function suggestedName(){
+  if(state.mode==="malware"){
+    const h=state.malware.sha.trim().slice(0,12);
+    return (h||"malware-writeup")+".md";
+  }
+  const t=(state.report.title||"findings-report").toLowerCase().trim().replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,"");
+  return (t||"findings-report")+".md";
+}
+
+/* ---------- downloads (appears a moment after load, may be absent) ---------- */
+let dlPromise=null;
+function getDownloads(){
+  if(dlPromise) return dlPromise;
+  dlPromise=new Promise(res=>{
+    let tries=0;
+    (function wait(){
+      if(window.claude&&typeof window.claude.use==="function"){ window.claude.use("downloads").then(res,()=>res(null)); return; }
+      if(++tries>50) return res(null);
+      setTimeout(wait,200);
+    })();
+  });
+  return dlPromise;
+}
+
+/* ---------- final step ---------- */
+function renderFinal(panel){
+  const md = state.mode==="report"?buildReport():buildMalware();
+  const name=el("input",{type:"text",class:"mono",id:"fname","aria-label":"File name"}); name.value=suggestedName();
+  const status=el("span",{class:"msg",role:"status"});
+  const copyBtn=el("button",{class:"btn primary",onclick:async()=>{
+    try{ await navigator.clipboard.writeText(md); status.className="msg ok"; status.textContent="Copied. Paste it into a new file on GitHub."; }
+    catch(e){ const r=document.createRange(); r.selectNodeContents(pre); const s=getSelection(); s.removeAllRanges(); s.addRange(r); status.className="msg bad"; status.textContent="Copy was blocked. The text is selected: press Ctrl + C."; }
+  }},"Copy the text");
+  const dlBtn=el("button",{class:"btn",hidden:"",onclick:async()=>{
+    let fn=name.value.trim()||suggestedName(); if(!/\.md$/i.test(fn)) fn+=".md";
+    try{
+      if(!(window.claude&&typeof window.claude.use==="function")){
+        const a=document.createElement("a"); a.href=URL.createObjectURL(new Blob([md],{type:"text/markdown"})); a.download=fn;
+        document.body.append(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(a.href),2000);
+        status.className="msg ok"; status.textContent="Downloaded "+fn+"."; return;
+      }
+      const dl=await getDownloads(); if(!dl) throw {code:"unavailable"};
+      await dl.save({filename:fn,data:md}); status.className="msg ok"; status.textContent="Downloaded "+fn+".";
+    }catch(e){ status.className="msg bad";
+      status.textContent = e&&e.code==="declined" ? "Download cancelled." : "Download isn't available here. Use Copy the text instead."; }
+  }},"Download .md file");
+  if(!(window.claude&&typeof window.claude.use==="function")) dlBtn.hidden=false;
+  getDownloads().then(d=>{ if(d) dlBtn.hidden=false; });
+  const pre=el("pre",{class:"preview",tabindex:"0","aria-label":"File preview"},md);
+  const where = state.mode==="report"
+    ? "Upload it to the reports folder, then add a line for it to the Findings table in your README."
+    : "Upload it to the malware folder, then add it to the Malware table in your README.";
+
+  /* README line maker */
+  const isR = state.mode==="report";
+  const linkTitle = isR ? (state.report.title.trim()||"Report") : (state.malware.nick.trim()||"Sample");
+  const hl=el("input",{type:"text",id:"hl"});
+  if(isR){
+    const parts=[]; const r=state.report;
+    if(String(r.stats.total).trim()) parts.push(fmt(r.stats.total.trim())+" events");
+    const pw=rowsFilled(r.passwords)[0]; if(pw&&String(pw[0]).trim()) parts.push("top password "+cell(pw[0],"mono"));
+    hl.value=parts.join(", ");
+  } else {
+    hl.value=(state.malware.vtFam.trim()||state.malware.vtDet.trim());
+  }
+  const lineOut=el("pre",{class:"preview",style:"max-height:none;white-space:pre-wrap;word-break:break-all"});
+  const lineMsg=el("span",{class:"msg",role:"status"});
+  function readmeLine(){
+    let fn=name.value.trim()||suggestedName(); if(!/\.md$/i.test(fn)) fn+=".md";
+    const t=linkTitle.replace(/[\[\]|]/g,"");
+    if(isR){
+      const dates=[state.report.start.trim(),state.report.end.trim()].filter(Boolean).join(" – ");
+      return "| ["+t+"](reports/"+fn+") | "+cell(dates)+" | "+hl.value.trim().replace(/\|/g,"\\|")+" |";
+    }
+    return "| ["+t+"](malware/"+fn+") | "+cell(state.malware.ftype)+" | "+hl.value.trim().replace(/\|/g,"\\|")+" |";
+  }
+  function updLine(){ lineOut.textContent=readmeLine(); }
+  name.addEventListener("input",updLine); hl.addEventListener("input",updLine); updLine();
+  const readmeBlock=el("div",{class:"block"},
+    el("h3",{},"Line for your README"),
+    el("p",{class:"hint"},isR?"Paste this as a new row in the Findings table, under the header row.":"Paste this as a new row in the Malware table, under the header row."),
+    el("div",{class:"field"},el("label",{for:"hl"},isR?"Highlights (short)":"Verdict (short)"),hl),
+    lineOut,
+    el("div",{class:"save-row"},el("button",{class:"btn",onclick:async()=>{
+      try{ await navigator.clipboard.writeText(readmeLine()); lineMsg.className="msg ok"; lineMsg.textContent="Copied the README line."; }
+      catch(e){ const rg=document.createRange(); rg.selectNodeContents(lineOut); const sl=getSelection(); sl.removeAllRanges(); sl.addRange(rg); lineMsg.className="msg bad"; lineMsg.textContent="Copy was blocked. The line is selected: press Ctrl + C."; }
+    }},"Copy the README line"),lineMsg)
+  );
+  panel.append(
+    el("div",{class:"skipnote"},"Anything you left empty has been left out, so the file stays tidy."),
+    el("div",{class:"field"},el("label",{for:"fname"},"File name"),name),
+    el("div",{class:"save-row"},copyBtn,dlBtn,status),
+    el("p",{class:"hint",style:"color:var(--soft);margin:0 0 14px"},where),
+    pre,
+    readmeBlock,
+    el("div",{style:"margin-top:18px"},el("button",{class:"btn quiet danger",onclick:()=>{
+      if(confirm("Start a new "+(state.mode==="report"?"report":"write-up")+"? This clears everything you typed here.")){
+        state[state.mode]=state.mode==="report"?blankReport():blankMalware(); state.step[state.mode]=0; save(); render();
+      }}},"Start a new one"))
+  );
+}
+
+/* ---------- main render ---------- */
+function render(){
+  document.querySelectorAll(".mode").forEach(b=>b.setAttribute("aria-pressed",String(b.dataset.mode===state.mode)));
+  renderRail();
+  const steps=STEPS[state.mode]; const i=Math.min(state.step[state.mode],steps.length-1); const s=steps[i];
+  const panel=$("#panel"); panel.innerHTML="";
+  panel.append(el("div",{class:"step-head"},el("h2",{},s.t),el("p",{},s.d)));
+  if(s.final) renderFinal(panel);
+  else if(state.mode==="report") renderReportStep(i,panel);
+  else renderMalwareStep(i,panel);
+  const nav=el("div",{class:"nav-bottom"},
+    i>0?el("button",{class:"btn",onclick:()=>{state.step[state.mode]=i-1;save();render();window.scrollTo({top:0})}},"Back"):el("span"),
+    i<steps.length-1?el("button",{class:"btn primary",onclick:()=>{state.step[state.mode]=i+1;save();render();window.scrollTo({top:0})}},i===steps.length-2?"See my file":"Next"):el("span"));
+  panel.append(nav);
+}
+document.querySelectorAll(".mode").forEach(b=>b.addEventListener("click",()=>{state.mode=b.dataset.mode;save();render();}));
+render();
+</script>
+</body>
+</html>

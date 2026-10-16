@@ -62,6 +62,32 @@ I want to make this both a **SOC lab** and a **honeypot lab** in one, so I can w
 
 ---
 
+## 📊 Findings
+
+| Report | Dates | Highlights |
+|---|---|---|
+
+---
+
+## 🦠 Malware
+
+| Sample | Type | Verdict |
+|---|---|---|
+
+---
+
+## 🛠️ Tools
+
+**[Shark Log](tools/shark-log.html)**: my own tool for writing up findings and malware.
+
+1. Download `tools/shark-log.html` and open it in a browser
+2. Fill in the steps (or paste results straight from Elasticvue)
+3. It makes the `.md` file for the `reports/` or `malware/` folder, plus the line to add to the tables above
+
+My saved searches are in [queries](queries/README.md).
+
+---
+
 ## Screenshots
 
 _Coming soon_
