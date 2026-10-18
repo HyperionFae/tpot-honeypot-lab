@@ -70,6 +70,7 @@ I want to make this both a **SOC lab** and a **honeypot lab** in one, so I can w
 
 | Report | Dates | Highlights |
 |---|---|---|
+| [Week 1](reports/week-1.md) | Oct 14, 2026 – Oct 18, 2026 | 7.9 million events, top password `123456`, mdrfckr backdoor caught |
 
 ---
 
