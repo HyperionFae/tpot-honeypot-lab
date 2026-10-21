@@ -79,6 +79,15 @@ I want to make this both a **SOC lab** and a **honeypot lab** in one, so I can w
 | Sample | Type | Verdict |
 |---|---|---|
 | [mdrfckr SSH backdoor](malware/mdrfckr-ssh-backdoor.md) | SSH keys + config | Known botnet (Outlaw / Dota), active since 2018 |
+
+---
+
+## 🚨 Incidents
+
+| Incident | Date | Outcome |
+|---|---|---|
+| [Critical PHP CVEs](incidents/2026-10-php-cve-response.md) | Oct 21, 2026 | Host not exposed; vulnerable PHP found in a container and contained |
+
 ---
 
 ## 🛠️ Tools
