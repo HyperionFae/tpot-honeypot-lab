@@ -72,6 +72,7 @@ I want to make this both a **SOC lab** and a **honeypot lab** in one, so I can w
 |---|---|---|
 | [Week 1](reports/week-1.md) | Oct 14, 2026 – Oct 18, 2026 | 7.9 million events, top password `123456`, mdrfckr backdoor caught |
 | [Week 2](reports/week-2.md) | Oct 19, 2026 – Oct 25, 2026 | 10.2 million events, RDP (3389) most attacked, French "Administrateur" logins |
+| [Week 3](reports/week-3.md) | Oct 26, 2026 – Nov 1, 2026 | 21.7 million events (double Week 2), German admin logins, full port scan caught |
 
 ---
 
