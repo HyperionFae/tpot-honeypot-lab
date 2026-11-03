@@ -81,6 +81,7 @@ I want to make this both a **SOC lab** and a **honeypot lab** in one, so I can w
 | Sample | Type | Verdict |
 |---|---|---|
 | [mdrfckr SSH backdoor](malware/mdrfckr-ssh-backdoor.md) | SSH keys + config | Known botnet (Outlaw / Dota), active since 2018 |
+| [Akuma botnet](malware/akuma-mirai-botnet.md) | Shell downloader + multi-chip bots | Mirai family, 4 senders, 1 download server, still active |
 
 ---
 
